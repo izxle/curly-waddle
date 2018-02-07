@@ -20,22 +20,32 @@ def get_adsorbate(adsorbate: str) -> Atoms:
     return ads
 
 
-def get_args():
+def get_args(argv=''):
     parser = ArgumentParser()
     parser.add_argument('filename')
-    parser.add_argument('adsorbate', nargs='?', default='O',
-                        choices=['O', 'OH'])
+    parser.add_argument('ads', nargs='?', default='O', choices=['O', 'OH'])
+    parser.add_argument('-t', '--template',
+                        help='directory with template files')
     parser.add_argument('-f', '--format')
-    return parser.parse_args()
+    if argv:
+        if isinstance(argv, str):
+            argv = argv.split()
+        elif not hasattr(argv, '__iter__'):
+            raise TypeError(f'argv must be `str` or iterable, not {type(argv)}')
+        args = parser.parse_args(argv)
+    else:
+        # get arguments from terminal
+        args = parser.parse_args()
+    return args
 
 
-def main():
-    args = get_args()
+def main(argv=''):
+    args = get_args(argv)
 
     atoms = read(args.filename, format=args.format)
-    ads = get_adsorbate(args.adsorbate)
+    adsorbate = get_adsorbate(args.ads)
 
-    for ID, struct in gen_structs(atoms, ads, **vars(args)):
+    for ID, struct in gen_structs(atoms, adsorbate, **vars(args)):
         if not exists(ID):
             mkdir(ID)
         # for tmp in templates:
@@ -45,4 +55,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main('../VaspTools/POSCAR.draft -f vasp')

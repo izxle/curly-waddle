@@ -1,7 +1,7 @@
 #!/bin/env python
 
 from itertools import combinations
-from typing import Tuple, Iterable
+from typing import Tuple, Iterable, Iterator
 
 import numpy as np
 from ase.atoms import Atoms
@@ -37,7 +37,7 @@ def in_cell(atoms: Atoms, index=None, position=None):
     :return: bool
     '''
     if index is not None:
-        scaled = atoms.scaled_positions[index][:2]
+        scaled = atoms.get_scaled_positions()[index][:2]
     elif position is not None:
         # scales position to cell
         scaled = np.linalg.solve(atoms.cell.T, position.T).T[:2]
@@ -65,7 +65,7 @@ def valid_comb(points, atoms, cutoff_dist):
            and valid_dist(points, atoms, cutoff_dist)
 
 
-def gen_midpoints(slab: Atoms, cutoff_dist: float=3.5, heights: Iterable[float]=None):
+def gen_midpoints(slab: Atoms, cutoff_dist: float=3.5, heights: Iterable[float]=None, **kw):
     h = heights or [(0, 0, i) for i in (0, 2, 1.8, 1.5, 1.3)]
     tags, layer_pos = get_layers(slab, (0, 0, 1), 0.3)
     surface_atoms = slab[tags == max(tags)]
@@ -78,9 +78,10 @@ def gen_midpoints(slab: Atoms, cutoff_dist: float=3.5, heights: Iterable[float]=
     mem = set()
 
     def memo(pos):
-        id = f'{pos[0]:.2f} {pos[1]:.2f}'
-        res = id in mem
-        if not res: mem.add(id)
+        label = f'{pos[0]:.2f} {pos[1]:.2f}'
+        res = label in mem
+        if not res:
+            mem.add(label)
         return res
 
     # combs = {f'1_{i}': pos + h[1] for i, pos in enumerate(surface_atoms.positions)}
@@ -90,10 +91,11 @@ def gen_midpoints(slab: Atoms, cutoff_dist: float=3.5, heights: Iterable[float]=
     for i in range(2, len(h)):
         ix = 0
         for comb in combinations(range(n_points), i):
-            if not valid_comb(comb, atoms, cutoff_dist): continue
+            if not valid_comb(comb, atoms, cutoff_dist):
+                continue
             mean = np.mean(comb, axis=0) + h[i]
-            if not in_cell(atoms, position=mean) \
-                    or memo(mean): continue
+            if not in_cell(atoms, position=mean) or memo(mean):
+                continue
             yield (f'{i}_{ix}', mean)
             ix += 1
 
@@ -120,7 +122,7 @@ def center_at_origin(atoms: Atoms) -> Atoms:
     return ads
 
 
-def gen_structs(atoms: Atoms, adsorbate: Atoms, **kw) -> Tuple[str, Atoms]:
+def gen_structs(atoms: Atoms, adsorbate: Atoms, **kw) -> Iterator[Tuple[str, Atoms]]:
     """
 
     :param atoms:
@@ -133,7 +135,8 @@ def gen_structs(atoms: Atoms, adsorbate: Atoms, **kw) -> Tuple[str, Atoms]:
     # yield from ((ID, atoms + ads.copy().translate(point))
     #             for ID, point in gen_midpoints(atoms, **kw))
     for ID, point in gen_midpoints(atoms, **kw):
-        a = ads.copy().translate(point)
+        a = ads.copy()
+        a.translate(point)
         yield (ID, atoms + a)
 
 
