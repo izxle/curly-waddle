@@ -24,18 +24,32 @@ def get_adsorbate(adsorbate: str) -> Atoms:
     return ads
 
 
-def parse_config(config):
-    debug = config.getboolean('GENERAL', 'debug')
-    xc = config.get('GENERAL', 'xc')
-    kpts_text = config.get('GENERAL', 'kpoints')
-    kpoints = [map(int, point.split())
-               for point in kpts_text.strip().split('\n')]
+def parse_config(config) -> dict:
+    """
+    Parses information from configuration
+    :param config: ConfigParser
+    :return: dict
+    """
+    if config.getboolean('GENERAL', 'debug'):
+        debug = 10
+    else:
+        debug = 0
 
+    xc = config.get('GENERAL', 'xc')
+
+    # KPOINTS section
+    kpts_text = config.get('GENERAL', 'kpoints')
+    kpoints = [list(map(int, point.split()))
+               for point in kpts_text.strip().split('\n')]
+    if len(kpoints) == 1:
+        kpoints = kpoints[0]
+
+    # INCAR section
     incar = dict()
     for name, value in config['INCAR'].items():
         vals = []
         for v in re.split('\s*,?\s+', value):
-            if re.match('-?\d+$', v):
+            if re.match('[-+]?\d+$', v):
                 v = int(v)
             elif re.match('(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$', v):
                 v = float(v)
@@ -47,7 +61,7 @@ def parse_config(config):
             vals = vals[0]
         incar[name] = vals
 
-    res = dict(kpoints=kpoints,
+    res = dict(kpts=kpoints,
                xc=xc,
                debug=debug,
                **incar)
@@ -113,7 +127,7 @@ def main(argv=''):
             results.append(None)
             print(e)
 
-    print(f'{sum(results)}/{len(results)} jobs finished')
+    print(f'{sum([r for r in results if r is not None])}/{len(results)} jobs finished')
 
 if __name__ == '__main__':
     main()
