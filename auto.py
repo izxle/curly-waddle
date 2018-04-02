@@ -66,6 +66,15 @@ def valid_comb(points, atoms, cutoff_dist):
 
 
 def gen_midpoints(slab: Atoms, cutoff_dist: float=3.5, heights: Iterable[float]=None, **kw):
+    """
+
+    :param slab:
+    :param cutoff_dist:
+    :param heights:
+    :param kw:
+    :return:
+    """
+    # default heights
     h = heights or [(0, 0, i) for i in (0, 2, 1.8, 1.5, 1.3)]
     tags, layer_pos = get_layers(slab, (0, 0, 1), 0.3)
     surface_atoms = slab[tags == max(tags)]
@@ -77,17 +86,17 @@ def gen_midpoints(slab: Atoms, cutoff_dist: float=3.5, heights: Iterable[float]=
 
     mem = set()
 
-    def memo(pos):
+    def memo(pos: Tuple[float, float]) -> bool:
         label = f'{pos[0]:.2f} {pos[1]:.2f}'
         res = label in mem
         if not res:
             mem.add(label)
         return res
 
-    # combs = {f'1_{i}': pos + h[1] for i, pos in enumerate(surface_atoms.positions)}
     for i, pos in enumerate(surface_atoms.positions):
         memo(pos)
         yield (f'1_{i}', pos + h[1])
+
     for i in range(2, len(h)):
         ix = 0
         for comb in combinations(range(n_points), i):
@@ -132,42 +141,9 @@ def gen_structs(atoms: Atoms, adsorbate: Atoms, **kw) -> Iterator[Tuple[str, Ato
     """
     # TODO: orient/rotate
     ads = center_at_origin(adsorbate)
-    # yield from ((ID, atoms + ads.copy().translate(point))
-    #             for ID, point in gen_midpoints(atoms, **kw))
+
     for ID, point in gen_midpoints(atoms, **kw):
         a = ads.copy()
         a.translate(point)
         yield (ID, atoms + a)
 
-
-# def getArgs():
-#     parser = ArgumentParser()
-#     parser.add_argument('filename')
-#     parser.add_argument('adsorbate', dest='ads', nargs='?', default='O',
-#                         choices=['O', 'OH'])
-#     parser.add_argument('-f', '--format')
-#     parser.add_argument('--template',
-#                         help='folder with template files')
-#     return parser.parse_args()
-
-
-# def get_adsorbate(adsorbate):
-#     if adsorbate == 'O':
-#         ads = Atoms('O')
-#     elif adsorbate == 'OH':
-#         ads = Atoms('OH', positions=[(0, 0, 0), (0, 0, 0.96)])
-#     return ads
-
-# def main():
-#     args = getArgs()
-#     templates = listdir(args.template)
-#     atoms = read(args.filename, args.format) if args.format else \
-#         read(args.filename)
-#     ads = get_adsorbate(args.ads)
-#
-#     for ID, struct in gen_structs(atoms, ads, **vars(args)):
-#         exists(ID) or mkdir(ID)
-#         for tmp in templates:
-#             copy(join(args.template, tmp), join(ID, tmp))
-#         struct.write(join(ID, 'POSCAR'), format='vasp', vasp5=True,
-#                      sort=True, direct=True)
