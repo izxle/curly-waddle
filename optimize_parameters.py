@@ -6,7 +6,7 @@ from matplotlib.axes import Axes
 from itertools import count
 from ase.io import read
 from ase.atoms import Atoms
-from ase.calculators.vasp import Vasp
+from vasp import Vasp
 from typing import Iterable
 from numbers import Real
 import logging
@@ -23,10 +23,13 @@ def run_vasp(atoms: Atoms):
         sigma=0.05,
         nelm=200,
         nsw=200)
-    calc = Vasp(xc=xc,
+    calc = Vasp('',
+                xc=xc,
                 kpoints=init_kpoints,
                 **incar)
     atoms.set_calculator(calc)
+
+    calc_params = dict()
 
     plot_params = dict(save_plot=True)
     encut_params = dict(start=250, step=50)
@@ -39,8 +42,10 @@ def run_vasp(atoms: Atoms):
     return
 
 
-def gen_calculation(atoms: Atoms, parameter: str, start: int, step: int=1):
+def gen_calculation(atoms: Atoms, parameter: str, start: int, step: int=1, calc_params: dict={}):
     for val in count(start, step):
+        name = f''
+        Vasp(name, **calc_params)
         atoms.calc.set(**{parameter: val})
         yield (val, atoms.get_total_energy())
 
@@ -53,7 +58,7 @@ def optimize(atoms: Atoms, parameter: str, params: dict={},
     # TODO: add optimization algorithm
     # naive approach
     prev_energy = float('inf')
-    for i, (value, energy) in enumerate(gen_calculation(atoms, parameter, **params)):
+    for i, (value, energy) in enumerate(gen_calculation(atoms, calc_params, change_params)):
         values.append(value)
         energies.append(energy)
         if abs(energy - prev_energy) < threshold or i >= max_iterations:

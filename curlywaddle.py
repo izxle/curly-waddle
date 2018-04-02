@@ -83,8 +83,6 @@ def get_args(argv=''):
     parser = ArgumentParser()
     parser.add_argument('slab')
     parser.add_argument('ads', nargs='?', default='O', choices=['O', 'OH'])
-    parser.add_argument('-t', '--template',
-                        help='directory with template files')
     parser.add_argument('-f', '--format')
     parser.add_argument('-c', '--config', default='config.ini')
     if argv:
@@ -127,7 +125,7 @@ def main(argv=''):
             results.append(None)
             print(e)
 
-    print(f'{sum([r for r in results if r is not None])}/{len(results)} jobs finished')
+    print(f'{len([r for r in results if r is not None])}/{len(results)} jobs finished')
 
 if __name__ == '__main__':
     main()
