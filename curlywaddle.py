@@ -3,7 +3,7 @@
 import re
 from argparse import ArgumentParser
 from configparser import ConfigParser
-from os import path
+from os import path, mkdir
 
 from ase.atoms import Atoms
 from ase.io import read
@@ -12,6 +12,11 @@ from vasp.exceptions import VaspSubmitted, VaspQueued
 
 from auto import gen_structs
 # from typing import
+
+# write_args = dict(format='vasp',
+#                   direct=True,
+#                   vasp5=True,
+#                   sort=True)
 
 
 def get_adsorbate(adsorbate: str) -> Atoms:
@@ -84,6 +89,8 @@ def get_args(argv=''):
     parser.add_argument('slab')
     parser.add_argument('ads', nargs='?', default='O', choices=['O', 'OH'])
     parser.add_argument('-f', '--format')
+    parser.add_argument('-r', '--readonly',
+                        help='writes POSCAR only, does not run')
     parser.add_argument('-c', '--config', default='config.ini')
     if argv:
         if isinstance(argv, str):
@@ -116,14 +123,15 @@ def main(argv=''):
 
         calc = Vasp(ID, atoms=struct, **config)
 
-        try:
-            toten = calc.potential_energy
-            results.append(toten)
-            # TODO: do something
+        if not args.readonly:
+            try:
+                toten = calc.potential_energy
+                results.append(toten)
+                # TODO: do something
 
-        except (VaspSubmitted, VaspQueued) as e:
-            results.append(None)
-            print(e)
+            except (VaspSubmitted, VaspQueued) as e:
+                results.append(None)
+                print(e)
 
     print(f'{len([r for r in results if r is not None])}/{len(results)} jobs finished')
 
