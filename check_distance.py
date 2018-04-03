@@ -2,12 +2,23 @@
 
 from argparse import ArgumentParser
 from os import path, listdir
-from ase.io import read
+
+import numpy as np
 from ase.geometry import distance
+from ase.io import read
+
+
+def atom_distance(a0, a1):
+    xy0 = a0.position[:2]
+    xy1 = a1.position[:2]
+    return np.linalg.norm(xy1 - xy0)
+
 
 def get_args(argv=''):
     parser = ArgumentParser()
-    parser.add_argument('something')
+    parser.add_argument('-a', '--all', action='store_true')
+    parser.add_argument('--xy',
+                        help='distance in the x and y axis of the given element')
     if argv:
         if isinstance(argv, str):
             argv = argv.split()
@@ -24,25 +35,34 @@ def get_args(argv=''):
 def main(argv='', threshold=0.001):
     args = get_args(argv)
 
-    distances = list()
+    distances = dict()
+    print('incorrect structures:')
     for name in listdir('.'):
         if not path.isdir(name):
             continue
-        rel_path_0 = path.join(name, 'POSCAR')
-        rel_path_1 = path.join(name, 'CONTCAR')
+        # get atoms object from POSCAR
+        poscar_path = path.join(name, 'POSCAR')
+        poscar = read(poscar_path)
+        # get atoms object from CONTCAR
+        contcar_path = path.join(name, 'CONTCAR')
+        contcar = read(contcar_path)
 
-        a0 = read(rel_path_0)
-        a1 = read(rel_path_1)
+        if args.xy:
+            # get the first atom whose symbol == args.xy
+            a0 = next(a for a in poscar if a.symbol == args.xy)
+            a1 = next(a for a in contcar if a.symbol == args.xy)
+            d = atom_distance(a0, a1)
+        else:
+            d = distance(poscar, contcar)
+        #
+        if d > threshold:
+            print(f'{name+":":11} {d:11.3f}')
+        distances[name] = d
 
-        d = distance(a0, a1)
-
-        distances.append(d)
-
-    for d in distances:
-        if d < threshold:
-            pass
-
-
+    if args.all:
+        print('all distances:')
+        for name, d in distances.items():
+            print(f'{name+":":11} {d:11.6f}')
 
 
 if __name__ == '__main__':
