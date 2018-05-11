@@ -6,6 +6,11 @@ from typing import Tuple, Iterable, Iterator
 import numpy as np
 from ase.atoms import Atoms
 from ase.geometry import get_layers
+from numpy.linalg import  norm
+
+import logging
+
+logger = logging.getLogger('curlywaddly')
 
 
 class MyAtoms(Atoms):
@@ -60,9 +65,27 @@ def valid_dist(indices, atoms, cutoff_dist):
                for i, j in combinations(indices, 2))
 
 
-def valid_comb(points, atoms, cutoff_dist):
-    return any(in_cell(atoms, index=point) for point in points) \
-           and valid_dist(points, atoms, cutoff_dist)
+def valid_comb(indices, atoms, expanded_atoms, cutoff_dist):
+    return any(in_cell(atoms, position=expanded_atoms[index].position) for index in indices) \
+           and valid_dist(indices, expanded_atoms, cutoff_dist)
+
+
+def distance(point1, point2):
+    return norm(point1 - point2)
+
+
+def get_incenter(point1, point2, point3):
+    Ax, Ay, Az = point1
+    Bx, By, Bz = point2
+    Cx, Cy, Cz = point3
+    a = distance(point2, point3)
+    b = distance(point1, point3)
+    c = distance(point1, point2)
+    p = a + b + c
+    Ox = (a*Ax + b*Bx + c*Cx) / p
+    Oy = (a*Ay + b*By + c*Cy) / p
+    Oz = np.mean( (Az, Bz, Cz) )
+    return np.array( (Ox, Oy, Oz) )
 
 
 def gen_midpoints(slab: Atoms, cutoff_dist: float=3.5, heights: Iterable[float]=None, **kw):
@@ -82,7 +105,7 @@ def gen_midpoints(slab: Atoms, cutoff_dist: float=3.5, heights: Iterable[float]=
     atoms = surface_atoms.repeat([3, 3, 1])
     n_points = len(atoms)
     # TODO: check if atoms moved
-    atoms.wrap(center=(0, 0, 0))
+    atoms.wrap(center=(1/6, 1/6, 0))
 
     mem = set()
 
@@ -99,11 +122,17 @@ def gen_midpoints(slab: Atoms, cutoff_dist: float=3.5, heights: Iterable[float]=
 
     for i in range(2, len(h)):
         ix = 0
-        for comb in combinations(range(n_points), i):
-            if not valid_comb(comb, atoms, cutoff_dist):
+        for indices in combinations(range(n_points), i):
+            if not valid_comb(indices, surface_atoms, atoms, cutoff_dist):
                 continue
-            mean = np.mean(comb, axis=0) + h[i]
-            if not in_cell(atoms, position=mean) or memo(mean):
+            positions = atoms.positions[list(indices)]
+            # TODO:
+            if i == 2:
+                mean = np.mean(positions, axis=0)
+            else:
+                mean = get_incenter(positions[0], positions[1], positions[2])
+            mean += h[i]
+            if not in_cell(surface_atoms, position=mean) or memo(tuple(mean)):
                 continue
             yield (f'{i}_{ix}', mean)
             ix += 1
@@ -145,5 +174,7 @@ def gen_structs(atoms: Atoms, adsorbate: Atoms, **kw) -> Iterator[Tuple[str, Ato
     for ID, point in gen_midpoints(atoms, **kw):
         a = ads.copy()
         a.translate(point)
-        yield (ID, atoms + a)
+        a.set_scaled_positions(point)
+        slab_ads = atoms + a
+        yield (ID,  slab_ads)
 
